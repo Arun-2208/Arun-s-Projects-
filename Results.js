@@ -1,31 +1,27 @@
-import { initRDKit, getRDKit } from '../utils/rdkit.js'
+import { initRDKit, getRDKit, safelyGenerateStructure } from '../utils/rdkit.js'
 import { QUESTION_MARK, ARROW_SVG, PLUS_SVG } from '../utils/svgs.js'
 import { convertToChemicalFormula } from '../utils/misc.js'
+import { checkAuth } from '../utils/auth.js'
 
 function renderTotalScore(totalScore, numQuestions) {
   const resultsList = document.getElementById('results-list')
   const newLiItem = document.createElement('li')
   resultsList.appendChild(newLiItem)
 
-  let avgPercentage=(totalScore/numQuestions)*100;
+  let avgPercentage = (totalScore / numQuestions) * 100
 
-  let displayMessage="";
+  let displayMessage = ''
 
-
-  if(avgPercentage<50)
-    displayMessage="Great , You have failed , expect the same if u do not work hard !!! ";
-
-  else if(avgPercentage>=50 && avgPercentage<=59)
-    displayMessage="You have barely  passed dude , be careful, You may fail anytime !!! ";
-
-  else if(avgPercentage>=60 && avgPercentage<=69)
-    displayMessage="You have managed a credit score mate , pretty decent !!! ";
-
-  else if(avgPercentage>=70 && avgPercentage<=79)
-    displayMessage="hmm , entering distinction area , are we ?? . good good  !!! ";
-
-  else if(avgPercentage>=80 && avgPercentage<=100)
-    displayMessage="wow , wow . congrats on the high distinction !!! ";
+  if (avgPercentage < 50)
+    displayMessage = 'Great , You have failed , expect the same if u do not work hard !!! '
+  else if (avgPercentage >= 50 && avgPercentage <= 59)
+    displayMessage = 'You have barely  passed dude , be careful, You may fail anytime !!! '
+  else if (avgPercentage >= 60 && avgPercentage <= 69)
+    displayMessage = 'You have managed a credit score mate , pretty decent !!! '
+  else if (avgPercentage >= 70 && avgPercentage <= 79)
+    displayMessage = 'hmm , entering distinction area , are we ?? . good good  !!! '
+  else if (avgPercentage >= 80 && avgPercentage <= 100)
+    displayMessage = 'wow , wow . congrats on the high distinction !!! '
 
   let template = `
     <p>
@@ -34,7 +30,7 @@ function renderTotalScore(totalScore, numQuestions) {
      / ${numQuestions * 10}
      </p>
      <p>${displayMessage}</P>
-     <button type="button"><a hfref="../welcome.html>Submit</button>
+     <a href="../welcome/welcome.html"><button type="button">Return</button></a>
   `
 
   newLiItem.innerHTML = template
@@ -43,12 +39,20 @@ function renderTotalScore(totalScore, numQuestions) {
 function renderReactionResult(question, playerAnswer, result, questionNo) {
   const RDKit = getRDKit()
 
-  const reactantSVG = RDKit.get_mol(question.reactant).get_svg()
-  const reagentSVG = question.reagent ? RDKit.get_mol(question.reagent).get_svg() : null
+  // const reactantSVG = RDKit.get_mol(question.reactant).get_svg()
+  // const reagentSVG = question.reagent ? RDKit.get_mol(question.reagent).get_svg() : null
 
-  const answerSVG = RDKit.get_mol(question.productSmile).get_svg()
+  // const answerSVG = RDKit.get_mol(question.productSmile).get_svg()
+  // const playerAnswerSVG = playerAnswer.userAnswerSmiles
+  //   ? RDKit.get_mol(playerAnswer.userAnswerSmiles).get_svg()
+  //   : null
+
+  const reactantSVG = safelyGenerateStructure(question.reactant)
+  const reagentSVG = question.reagent ? safelyGenerateStructure(question.reagent) : null
+
+  const answerSVG = safelyGenerateStructure(question.productSmile)
   const playerAnswerSVG = playerAnswer.userAnswerSmiles
-    ? RDKit.get_mol(playerAnswer.userAnswerSmiles).get_svg()
+    ? safelyGenerateStructure(playerAnswer.userAnswerSmiles)
     : null
 
   let template = `
@@ -117,7 +121,7 @@ function renderStructureResult(question, playerAnswer, result, questionNo) {
   return template
 }
 
-function renderPlayerResponses(questions, playerAnswers, resultsObject) {
+function renderPlayerResponses(questions, playerAnswers, resultsArray, score) {
   const resultsList = document.getElementById('results-list')
 
   // i corresponds to the question number
@@ -128,28 +132,33 @@ function renderPlayerResponses(questions, playerAnswers, resultsObject) {
     let liContent = ''
 
     if (questions[i].structureId) {
-      liContent = renderStructureResult(questions[i], playerAnswers[i], resultsObject.results[i], i)
+      liContent = renderStructureResult(questions[i], playerAnswers[i], resultsArray[i], i)
     }
 
     if (questions[i].reactionId) {
-      liContent = renderReactionResult(questions[i], playerAnswers[i], resultsObject.results[i], i)
+      liContent = renderReactionResult(questions[i], playerAnswers[i], resultsArray[i], i)
     }
 
     newLiItem.innerHTML = liContent
   }
 
-  renderTotalScore(resultsObject.score, questions.length)
+  renderTotalScore(score, questions.length)
 }
 
 async function init() {
+  // prevent unauthorized users from entering admin area
+  checkAuth()
+
   await initRDKit()
 
   const questions = JSON.parse(sessionStorage.getItem('questions'))
   const playerAnswers = JSON.parse(sessionStorage.getItem('playerAnswers'))
-  const resultsObject = JSON.parse(sessionStorage.getItem('results'))
+  const resultsArray = JSON.parse(sessionStorage.getItem('results'))
+  const score = sessionStorage.getItem('score')
 
+  console.log(questions, playerAnswers, resultsArray)
 
-  renderPlayerResponses(questions, playerAnswers, resultsObject)
+  renderPlayerResponses(questions, playerAnswers, resultsArray, score)
 }
 
 onload = init
